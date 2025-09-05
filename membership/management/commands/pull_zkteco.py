@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from membership.models import GymMember, GymInout
 from membership.zk_utils import get_connection
+from django.utils.timezone import make_aware, is_naive
 
 class Command(BaseCommand):
     help = "Pull attendance logs from ZKTeco device and sync with GymInout table"
@@ -13,8 +14,10 @@ class Command(BaseCommand):
 
             logs = conn.get_attendance()
             for log in logs:
-                user_id = str(log.user_id)  # device user_id
+                user_id = str(log.user_id)
                 punch_time = log.timestamp
+                if is_naive(punch_time):
+                    punch_time = make_aware(punch_time)
 
                 try:
                     member = GymMember.objects.get(members_reg_number=user_id)
@@ -22,7 +25,6 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(f"No member linked for device user {user_id}"))
                     continue
 
-                # Check if already has in_time today
                 inout, created = GymInout.objects.get_or_create(
                     member_id=member.id,
                     member_reg_code=member.members_reg_number,
@@ -31,7 +33,6 @@ class Command(BaseCommand):
                 )
 
                 if not created:
-                    # If already exists, update out_time
                     if not inout.out_time or punch_time > inout.out_time:
                         inout.out_time = punch_time
                         inout.save()
