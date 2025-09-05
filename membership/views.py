@@ -41,7 +41,7 @@ from rest_framework.decorators import action
 
 
 class MemberDataViewSet(viewsets.ModelViewSet):
-    queryset = GymMember.objects.filter(role_name__iexact='member')
+    queryset = GymMember.objects.filter(role_name__iexact='member').order_by('-created_date')
     serializer_class = GymMemberSerializer
     permission_classes = [AllowAny]
     pagination_class = CustomPageNumberPagination
@@ -100,7 +100,7 @@ class MemberDataViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="enroll-device")
     def enroll_on_device(self, request, pk=None):
         """Push a member to ZKTeco device for fingerprint enrollment"""
-        member = get_object_or_404(GymMember, pk=pk)
+        member = get_object_or_404(GymMember, members_reg_number=pk)
 
         try:
             conn = get_connection()

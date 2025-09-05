@@ -3,6 +3,7 @@ from django.utils import timezone
 from membership.models import GymMember, GymInout
 from membership.zk_utils import get_connection
 from django.utils.timezone import make_aware, is_naive
+from datetime import datetime
 
 class Command(BaseCommand):
     help = "Pull attendance logs from ZKTeco device and sync with GymInout table"
@@ -13,6 +14,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("Connected to device"))
 
             logs = conn.get_attendance()
+
             for log in logs:
                 user_id = str(log.user_id)
                 punch_time = log.timestamp
@@ -25,17 +27,31 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(f"No member linked for device user {user_id}"))
                     continue
 
-                inout, created = GymInout.objects.get_or_create(
-                    member_id=member.id,
-                    member_reg_code=member.members_reg_number,
-                    in_time__date=punch_time.date(),
-                    defaults={"in_time": punch_time},
-                )
+                punch_date = punch_time.date()
 
-                if not created:
+                # Check if an entry exists for this member on this date
+                inout = GymInout.objects.filter(
+                    member_id=member.id,
+                    in_time__date=punch_date
+                ).first()
+
+                if inout:
+                    # Update in_time if the new punch is earlier
+                    if punch_time < inout.in_time:
+                        inout.in_time = punch_time
+
+                    # Update out_time if the new punch is later
                     if not inout.out_time or punch_time > inout.out_time:
                         inout.out_time = punch_time
-                        inout.save()
+
+                    inout.save()
+                else:
+                    # No existing inout for the day, create a new one
+                    GymInout.objects.create(
+                        member_id=member.id,
+                        member_reg_code=member.members_reg_number,
+                        in_time=punch_time
+                    )
 
                 self.stdout.write(self.style.SUCCESS(
                     f"Synced log for {member.first_name} at {punch_time}"
