@@ -41,9 +41,9 @@ from rest_framework.decorators import action
 
 
 class MemberDataViewSet(viewsets.ModelViewSet):
-    queryset = GymMember.objects.filter(role_name__iexact='member')
+    queryset = GymMember.objects.filter(role_name__iexact='member').order_by('-created_date')
     serializer_class = GymMemberSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = CustomPageNumberPagination
     filter_backends = (DjangoFilterBackend,)
     filterset_class = GymMemberFilter
@@ -100,7 +100,7 @@ class MemberDataViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="enroll-device")
     def enroll_on_device(self, request, pk=None):
         """Push a member to ZKTeco device for fingerprint enrollment"""
-        member = get_object_or_404(GymMember, pk=pk)
+        member = get_object_or_404(GymMember, members_reg_number=pk)
 
         try:
             conn = get_connection()
@@ -110,6 +110,18 @@ class MemberDataViewSet(viewsets.ModelViewSet):
                 member.members_reg_number = str(member.id)
                 member.save()
 
+            # Fetch existing users from the device
+            existing_users = conn.get_users()
+            existing_user_ids = [str(user.user_id) for user in existing_users]
+
+            if member.members_reg_number in existing_user_ids:
+                conn.disconnect()
+                return Response(
+                    {"error": f"{member.first_name} is already enrolled on the device"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Add user if not already on device
             conn.set_user(
                 uid=int(member.members_reg_number),
                 name=f"{member.first_name or ''} {member.last_name or ''}".strip(),
@@ -124,12 +136,12 @@ class MemberDataViewSet(viewsets.ModelViewSet):
                 {"message": f"{member.first_name} enrolled on device successfully"},
                 status=status.HTTP_200_OK,
             )
+
         except Exception as e:
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
 class MemberShipViewSet(viewsets.ModelViewSet):
     queryset = Membership.objects.all()
