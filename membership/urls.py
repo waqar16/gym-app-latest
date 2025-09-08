@@ -12,7 +12,12 @@ from .views import (
     TokenRefreshViewWithAdminPermission,
     AuthenticationCheckAPIView,
     AcceptPaymentView,
+    GymInoutAttendanceViewSet
 )
+
+
+attendance_list = GymInoutAttendanceViewSet.as_view({"get": "list"})
+
 # from .views import CustomLogin, TokenRefreshViewWithAdminPermission
 # from .views import (
 #     TotalMembersAPIView,
@@ -49,6 +54,7 @@ urlpatterns = [
     path('finger_mode/', FingerModeView.as_view(), name='finger_mode'),
     path('api/accept-payment/', AcceptPaymentView.as_view(), name='accept-payment'),
     path('api/inout/', GymInoutViewSet.as_view({'get': 'list'}), name='inout'),
+    path("api/inout/attendance/<str:member_reg_code>/", attendance_list, name="member-attendance"),
 
 #     # Register APIViews
 #     path('api/total-members/', TotalMembersAPIView.as_view(), name='total-members'),

@@ -341,6 +341,27 @@ class GymInoutViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPageNumberPagination
     filter_backends = (DjangoFilterBackend,)
     filterset_class = GymInoutFilter
+    
+
+
+class GymInoutAttendanceViewSet(viewsets.ViewSet):
+    permission_classes = [AllowAny]
+    filter_backends = (DjangoFilterBackend,)
+
+    def list(self, request, member_reg_code=None):
+        if not member_reg_code:
+            return Response({"error": "Member reg code is required"}, status=400)
+
+        # fetch only the dates (distinct by day if needed)
+        qs = GymInout.objects.filter(member_reg_code=member_reg_code).order_by("-in_time")
+
+        # if you want every record’s timestamp:
+        dates = [entry.in_time.date() for entry in qs if entry.in_time]
+
+        # if you want unique days only:
+        # dates = sorted({entry.in_time.date() for entry in qs if entry.in_time}, reverse=True)
+
+        return Response(dates)
 
 
 # Global in-memory store to hold the current finger mode and member ID
