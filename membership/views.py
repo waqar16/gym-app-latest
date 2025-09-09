@@ -197,11 +197,12 @@ class AcceptPaymentView(APIView):
         member_id = request.data.get('member_id')
         membership_class = request.data.get('membership_class')
         paid_amount = request.data.get('paid_amount')
+        # registration_fees = request.data.get('registration_fees')
 
         if not all([member_id, membership_class]):
             return Response({"error": "Missing required fields member_id and membership_class"}, status=status.HTTP_400_BAD_REQUEST)
         
-        members = GymMember.objects.filter(member_id=member_id)
+        members = GymMember.objects.filter(members_reg_number=member_id)
         member = members.first()
         if not member:
             return Response({"error": "Member not found"}, status=status.HTTP_404_NOT_FOUND)
