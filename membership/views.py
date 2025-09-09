@@ -153,7 +153,7 @@ class MemberShipViewSet(viewsets.ModelViewSet):
 
 
 class MemberShipPaymentViewSet(viewsets.ModelViewSet):
-    queryset = MembershipPayment.objects.all().exclude(is_active=0).order_by('-start_date')
+    queryset = MembershipPayment.objects.all().exclude(is_active=0).order_by('-created_date')
     serializer_class = MembershipPaymentSerializer
     permission_classes = [AllowAny]
     pagination_class = CustomPageNumberPagination
