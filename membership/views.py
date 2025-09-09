@@ -155,7 +155,7 @@ class MemberShipViewSet(viewsets.ModelViewSet):
 class MemberShipPaymentViewSet(viewsets.ModelViewSet):
     queryset = MembershipPayment.objects.all().exclude(is_active=0).order_by('-start_date')
     serializer_class = MembershipPaymentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = CustomPageNumberPagination
     filter_backends = (DjangoFilterBackend,)
     filterset_class = MembershipPaymentFilter
@@ -172,16 +172,28 @@ class MemberShipPaymentViewSet(viewsets.ModelViewSet):
             member_id = mp.member_id
             return generate_pdf_receipt(mp, member_id)
         
-        return super().list(request, *args, **kwargs)
+        # ✅ filter by member_id and return only the latest payment
+        member_id = self.request.query_params.get('member_id', None)
+        if member_id:
+            payment = (
+                self.queryset.filter(member_id=member_id)
+                .order_by("-start_date")
+                .first()
+            )
+            if not payment:
+                return Response({"error": "No payments found for this member"}, status=404)
 
-    
+            serializer = self.get_serializer(payment)
+            return Response(serializer.data)
+
+
+        return super().list(request, *args, **kwargs)
 
 
 class AcceptPaymentView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, *args, **kwargs):
-        # amount = request.data.get('amount')
         member_id = request.data.get('member_id')
         membership_class = request.data.get('membership_class')
         paid_amount = request.data.get('paid_amount')
@@ -190,13 +202,15 @@ class AcceptPaymentView(APIView):
             return Response({"error": "Missing required fields member_id and membership_class"}, status=status.HTTP_400_BAD_REQUEST)
         
         members = GymMember.objects.filter(member_id=member_id)
-
         member = members.first()
+        if not member:
+            return Response({"error": "Member not found"}, status=status.HTTP_404_NOT_FOUND)
         
         valid_membership_classes = ['Regular Monthly', '3 month Cardio', 'Cardio Monthly', '3 Month Gym']
         if membership_class not in valid_membership_classes:
             return Response({"error": f"Invalid membership class. Choices are {', '.join(valid_membership_classes)}"}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Decide validity and amount
         if membership_class == "Regular Monthly":
             updated_date_to_expire = timezone.now() + timedelta(days=30)
             amount = Membership.objects.get(membership_label='Regular Monthly').membership_amount
@@ -209,18 +223,31 @@ class AcceptPaymentView(APIView):
         elif membership_class == "3 Month Gym":
             updated_date_to_expire = timezone.now() + timedelta(days=90)
             amount = Membership.objects.get(membership_label='3 Month Gym').membership_amount
-        
+
+        # Update member info
         member.membership_valid_from = timezone.now()
         member.membership_valid_to = updated_date_to_expire
         member.selected_membership = membership_class
         member.membership_status = 'continue'
         member.save()
 
+        # Calculate due amount
+        try:
+            paid_amount = float(paid_amount)
+        except (ValueError, TypeError):
+            return Response({"error": "Invalid paid_amount"}, status=status.HTTP_400_BAD_REQUEST)
+
+        due_amount = float(amount) - paid_amount
+        if due_amount < 0:
+            due_amount = 0  # prevent negative due if overpaid
+
+        # Save payment
         payment_data = {
             'member_id': member.member_id,
             'membership_id': Membership.objects.get(membership_label=membership_class).id,
             'membership_amount': amount,
             'paid_amount': paid_amount,
+            'due_amount': due_amount,  # ✅ added field
             'start_date': timezone.now().date(),
             'end_date': updated_date_to_expire.date(),      
             'membership_status': 'Continue',
@@ -233,7 +260,72 @@ class AcceptPaymentView(APIView):
         else:
             return Response(payment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"message": "Payment accepted and member record updated."}, status=status.HTTP_200_OK)
+        return Response({
+            "message": "Payment accepted and member record updated.",
+            "membership_amount": amount,
+            "paid_amount": paid_amount,
+            "due_amount": due_amount
+        }, status=status.HTTP_200_OK)
+
+
+
+# class AcceptPaymentView(APIView):
+#     permission_classes = [IsAuthenticated]
+    
+#     def post(self, request, *args, **kwargs):
+#         # amount = request.data.get('amount')
+#         member_id = request.data.get('member_id')
+#         membership_class = request.data.get('membership_class')
+#         paid_amount = request.data.get('paid_amount')
+
+#         if not all([member_id, membership_class]):
+#             return Response({"error": "Missing required fields member_id and membership_class"}, status=status.HTTP_400_BAD_REQUEST)
+        
+#         members = GymMember.objects.filter(member_id=member_id)
+
+#         member = members.first()
+        
+#         valid_membership_classes = ['Regular Monthly', '3 month Cardio', 'Cardio Monthly', '3 Month Gym']
+#         if membership_class not in valid_membership_classes:
+#             return Response({"error": f"Invalid membership class. Choices are {', '.join(valid_membership_classes)}"}, status=status.HTTP_400_BAD_REQUEST)
+        
+#         if membership_class == "Regular Monthly":
+#             updated_date_to_expire = timezone.now() + timedelta(days=30)
+#             amount = Membership.objects.get(membership_label='Regular Monthly').membership_amount
+#         elif membership_class == "3 month Cardio":
+#             updated_date_to_expire = timezone.now() + timedelta(days=90)
+#             amount = Membership.objects.get(membership_label='3 month Cardio').membership_amount
+#         elif membership_class == "Cardio Monthly":
+#             updated_date_to_expire = timezone.now() + timedelta(days=30)
+#             amount = Membership.objects.get(membership_label='Cardio Monthly').membership_amount
+#         elif membership_class == "3 Month Gym":
+#             updated_date_to_expire = timezone.now() + timedelta(days=90)
+#             amount = Membership.objects.get(membership_label='3 Month Gym').membership_amount
+        
+#         member.membership_valid_from = timezone.now()
+#         member.membership_valid_to = updated_date_to_expire
+#         member.selected_membership = membership_class
+#         member.membership_status = 'continue'
+#         member.save()
+
+#         payment_data = {
+#             'member_id': member.member_id,
+#             'membership_id': Membership.objects.get(membership_label=membership_class).id,
+#             'membership_amount': amount,
+#             'paid_amount': paid_amount,
+#             'start_date': timezone.now().date(),
+#             'end_date': updated_date_to_expire.date(),      
+#             'membership_status': 'Continue',
+#             'created_date': timezone.now().date(),
+#             'is_active': 1,
+#         }
+#         payment_serializer = MembershipPaymentSerializer(data=payment_data)
+#         if payment_serializer.is_valid():
+#             payment_serializer.save()
+#         else:
+#             return Response(payment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+#         return Response({"message": "Payment accepted and member record updated."}, status=status.HTTP_200_OK)
     
 
 class GymIncomeExpenseViewSet(viewsets.ModelViewSet):
