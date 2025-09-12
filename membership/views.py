@@ -57,10 +57,10 @@ class MemberDataViewSet(viewsets.ModelViewSet):
         else:
             member.membership_status = 'continue'
 
-        # Auto-generate member_reg_code using the member's ID
-        if not member.members_reg_number:
-            member.members_reg_number = member.id
-            member.save()
+        member.members_reg_number = member.id
+        member.member_id = member.id
+        member.save()
+
 
     def perform_update(self, serializer):
         super().perform_update(serializer)
