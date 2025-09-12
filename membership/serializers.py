@@ -67,13 +67,23 @@ class GymMemberSerializer(serializers.ModelSerializer):
 class MembershipPaymentSerializer(serializers.ModelSerializer):
     # Adding member_info field to show member's name
     member_info = serializers.SerializerMethodField()
+    registration_fees = serializers.SerializerMethodField()
+    total_amount = serializers.SerializerMethodField()
     due_amount = serializers.SerializerMethodField()
 
-    def get_due_amount(self, obj):
-        if obj.membership_amount and obj.paid_amount is not None:
-            return obj.membership_amount - obj.paid_amount
-        return None
 
+    def get_registration_fees(self, obj):
+        return obj.signupfee or 0
+
+    def get_total_amount(self, obj):
+        base = obj.membership_amount or 0
+        reg = obj.signupfee or 0
+        return base + reg
+
+    def get_due_amount(self, obj):
+        total = self.get_total_amount(obj)
+        paid = obj.paid_amount or 0
+        return max(total - paid, 0)
 
     def get_member_info(self, obj):
         member = None

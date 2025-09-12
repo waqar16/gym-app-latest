@@ -197,7 +197,7 @@ class AcceptPaymentView(APIView):
         member_id = request.data.get('member_id')
         membership_class = request.data.get('membership_class')
         paid_amount = request.data.get('paid_amount')
-        # registration_fees = request.data.get('registration_fees')
+        registration_fees = request.data.get('registration_fees', 0)
 
         if not all([member_id, membership_class]):
             return Response({"error": "Missing required fields member_id and membership_class"}, status=status.HTTP_400_BAD_REQUEST)
@@ -214,16 +214,16 @@ class AcceptPaymentView(APIView):
         # Decide validity and amount
         if membership_class == "Regular Monthly":
             updated_date_to_expire = timezone.now() + timedelta(days=30)
-            amount = Membership.objects.get(membership_label='Regular Monthly').membership_amount
+            base_amount = Membership.objects.get(membership_label='Regular Monthly').membership_amount
         elif membership_class == "3 month Cardio":
             updated_date_to_expire = timezone.now() + timedelta(days=90)
-            amount = Membership.objects.get(membership_label='3 month Cardio').membership_amount
+            base_amount = Membership.objects.get(membership_label='3 month Cardio').membership_amount
         elif membership_class == "Cardio Monthly":
             updated_date_to_expire = timezone.now() + timedelta(days=30)
-            amount = Membership.objects.get(membership_label='Cardio Monthly').membership_amount
+            base_amount = Membership.objects.get(membership_label='Cardio Monthly').membership_amount
         elif membership_class == "3 Month Gym":
             updated_date_to_expire = timezone.now() + timedelta(days=90)
-            amount = Membership.objects.get(membership_label='3 Month Gym').membership_amount
+            base_amount = Membership.objects.get(membership_label='3 Month Gym').membership_amount
 
         # Update member info
         member.membership_valid_from = timezone.now()
@@ -232,23 +232,27 @@ class AcceptPaymentView(APIView):
         member.membership_status = 'continue'
         member.save()
 
-        # Calculate due amount
+        # Safe parse amounts
         try:
             paid_amount = float(paid_amount)
+            registration_fees = float(registration_fees)
         except (ValueError, TypeError):
-            return Response({"error": "Invalid paid_amount"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid amount values"}, status=status.HTTP_400_BAD_REQUEST)
 
-        due_amount = float(amount) - paid_amount
+        # Total = membership fee + registration fee
+        total_amount = base_amount + registration_fees
+        due_amount = total_amount - paid_amount
         if due_amount < 0:
-            due_amount = 0  # prevent negative due if overpaid
+            due_amount = 0  # prevent negative
 
         # Save payment
         payment_data = {
             'member_id': member.member_id,
             'membership_id': Membership.objects.get(membership_label=membership_class).id,
-            'membership_amount': amount,
+            'membership_amount': base_amount,
             'paid_amount': paid_amount,
-            'due_amount': due_amount,  # ✅ added field
+            'due_amount': due_amount,       # ✅ dynamic field
+            'signupfee': registration_fees, # ✅ store in existing field, no schema change
             'start_date': timezone.now().date(),
             'end_date': updated_date_to_expire.date(),      
             'membership_status': 'Continue',
@@ -263,12 +267,12 @@ class AcceptPaymentView(APIView):
 
         return Response({
             "message": "Payment accepted and member record updated.",
-            "membership_amount": amount,
+            "membership_amount": base_amount,
+            "registration_fees": registration_fees,
+            "total_amount": total_amount,
             "paid_amount": paid_amount,
             "due_amount": due_amount
         }, status=status.HTTP_200_OK)
-
-
 
 # class AcceptPaymentView(APIView):
 #     permission_classes = [IsAuthenticated]
