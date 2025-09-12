@@ -251,8 +251,8 @@ class AcceptPaymentView(APIView):
             'membership_id': Membership.objects.get(membership_label=membership_class).id,
             'membership_amount': base_amount,
             'paid_amount': paid_amount,
-            'due_amount': due_amount,       # ✅ dynamic field
-            'signupfee': registration_fees, # ✅ store in existing field, no schema change
+            'due_amount': due_amount,   
+            'signupfee': registration_fees,
             'start_date': timezone.now().date(),
             'end_date': updated_date_to_expire.date(),      
             'membership_status': 'Continue',
@@ -268,7 +268,7 @@ class AcceptPaymentView(APIView):
         return Response({
             "message": "Payment accepted and member record updated.",
             "membership_amount": base_amount,
-            "registration_fees": registration_fees,
+            "signupfee": registration_fees,
             "total_amount": total_amount,
             "paid_amount": paid_amount,
             "due_amount": due_amount
