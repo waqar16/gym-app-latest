@@ -49,35 +49,34 @@ class MemberDataViewSet(viewsets.ModelViewSet):
     filterset_class = GymMemberFilter
 
     def perform_create(self, serializer):
-        # Save the instance first
         member = serializer.save()
-
-        if member.membership_valid_to < timezone.now().date():
-            member.membership_status = 'expired'
-        else:
-            member.membership_status = 'continue'
-
-        member.members_reg_number = member.id
-        member.member_id = member.id
+        member.update_membership_fields()
         member.save()
+
+
+        membership_obj = None
+        if member.selected_membership:
+            membership_obj = Membership.objects.get(id=member.selected_membership)
+
+
+        MembershipPayment.objects.create(
+            member_id=member.id,
+            start_date=member.membership_valid_from,
+            membership_id = member.selected_membership,
+            end_date=member.membership_valid_to,
+            membership_amount=membership_obj.membership_amount if membership_obj else 0,
+            paid_amount=0,
+            signupfee=0,
+            is_active=1,
+            created_date=timezone.now().date(),
+        )
 
 
     def perform_update(self, serializer):
-        super().perform_update(serializer)
-        
-        # Get the member object after saving
-        member = serializer.instance
-
-        if member.membership_valid_to and member.membership_valid_to < timezone.now().date():
-            member.membership_status = 'expired'
-        else:
-            member.membership_status = 'continue'
-
-        if not member.members_reg_number:
-            member.members_reg_number = member.member_id
-
-        # Save the updated membership status
-        member.save()
+            super().perform_update(serializer)
+            member = serializer.instance
+            member.update_membership_fields()
+            member.save()
 
     def list(self, request, *args, **kwargs):
         # Update membership statuses before returning data

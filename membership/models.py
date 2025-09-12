@@ -354,6 +354,7 @@ class GymMeasurement(models.Model):
         db_table = 'gym_measurement'
 
 
+from django.utils import timezone
 class GymMember(models.Model):
     activated = models.IntegerField(blank=True, null=True)
     role_name = models.TextField(blank=True, null=True)
@@ -409,6 +410,22 @@ class GymMember(models.Model):
     class Meta:
         managed = False
         db_table = 'gym_member'
+
+    def update_membership_fields(self):
+        """Keep membership status and IDs consistent (safe for managed=False)."""
+        today = timezone.now().date()
+
+        # Status check
+        if self.membership_valid_to and self.membership_valid_to < today:
+            self.membership_status = 'expired'
+        else:
+            self.membership_status = 'continue'
+
+        # IDs (must be string since DB fields are text/char)
+        if not self.members_reg_number:
+            self.members_reg_number = str(self.id)
+        if not self.member_id:
+            self.member_id = str(self.id)
 
 
 class GymMemberClass(models.Model):
