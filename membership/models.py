@@ -420,6 +420,7 @@ class GymMember(models.Model):
             self.membership_status = 'expired'
         else:
             self.membership_status = 'continue'
+            
 
         # IDs (must be string since DB fields are text/char)
         if not self.members_reg_number:

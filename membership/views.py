@@ -2,6 +2,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from .CustomPagination import CustomPageNumberPagination
+import time, random
 from .utils import generate_pdf_receipt
 from datetime import timedelta
 from .models import (
@@ -41,7 +42,7 @@ from rest_framework.decorators import action
 
 
 class MemberDataViewSet(viewsets.ModelViewSet):
-    queryset = GymMember.objects.filter(role_name__iexact='member').order_by('-created_date')
+    queryset = GymMember.objects.filter(role_name__iexact='member').order_by('-id')
     serializer_class = GymMemberSerializer
     permission_classes = [AllowAny]
     pagination_class = CustomPageNumberPagination
@@ -60,8 +61,9 @@ class MemberDataViewSet(viewsets.ModelViewSet):
 
 
         MembershipPayment.objects.create(
-            member_id=member.id,
-            start_date=member.membership_valid_from,
+            mp_id = int(time.time()) + random.randint(100, 999),  # its good for db key
+            member_id = member.id,
+            start_date = member.membership_valid_from,
             membership_id = member.selected_membership,
             end_date=member.membership_valid_to,
             membership_amount=membership_obj.membership_amount if membership_obj else 0,
@@ -193,6 +195,7 @@ class AcceptPaymentView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, *args, **kwargs):
+        mp_id = request.data.get('mp_id')
         member_id = request.data.get('member_id')
         membership_class = request.data.get('membership_class')
         paid_amount = request.data.get('paid_amount')
@@ -244,13 +247,13 @@ class AcceptPaymentView(APIView):
         if due_amount < 0:
             due_amount = 0  # prevent negative
 
+        
+        payment = MembershipPayment.objects.get(mp_id=mp_id)
+
         # Save payment
         payment_data = {
-            'member_id': member.member_id,
             'membership_id': Membership.objects.get(membership_label=membership_class).id,
-            'membership_amount': base_amount,
-            'paid_amount': paid_amount,
-            'due_amount': due_amount,   
+            'paid_amount': paid_amount,  
             'signupfee': registration_fees,
             'start_date': timezone.now().date(),
             'end_date': updated_date_to_expire.date(),      
@@ -258,7 +261,7 @@ class AcceptPaymentView(APIView):
             'created_date': timezone.now().date(),
             'is_active': 1,
         }
-        payment_serializer = MembershipPaymentSerializer(data=payment_data)
+        payment_serializer = MembershipPaymentSerializer(payment, data=payment_data, partial=True)
         if payment_serializer.is_valid():
             payment_serializer.save()
         else:
