@@ -427,7 +427,9 @@ class GymMember(models.Model):
             self.members_reg_number = str(self.id)
         if not self.member_id:
             self.member_id = str(self.id)
-
+    
+        if not self.created_date:
+            self.created_date = today
 
 class GymMemberClass(models.Model):
     member_id = models.IntegerField(blank=True, null=True)

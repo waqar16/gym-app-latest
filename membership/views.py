@@ -42,7 +42,7 @@ from rest_framework.decorators import action
 
 
 class MemberDataViewSet(viewsets.ModelViewSet):
-    queryset = GymMember.objects.filter(role_name__iexact='member').order_by('-id')
+    queryset = GymMember.objects.filter(role_name__iexact='member').order_by('-created_date')
     serializer_class = GymMemberSerializer
     permission_classes = [AllowAny]
     pagination_class = CustomPageNumberPagination
