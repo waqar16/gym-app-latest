@@ -52,26 +52,29 @@ class MembershipFilter(filters.FilterSet):
         fields = []
 
 
-import django_filters
-class MembershipPaymentFilter(django_filters.FilterSet):
-    member_id = django_filters.NumberFilter(field_name="member_id", lookup_expr="exact")
-    created_date = django_filters.DateFilter(field_name="created_date", lookup_expr="exact")
-    membership_status = django_filters.CharFilter(field_name="membership_status", lookup_expr="icontains")
+class MembershipPaymentFilter(filters.FilterSet):
+    global_search = filters.CharFilter(method='filter_global_search', label='Search')
 
-    # Custom field for searching by member name
-    member_name = django_filters.CharFilter(method="filter_by_member_name")
+    def filter_global_search(self, queryset, name, value):
+        """Search by member_id, membership_status, created_date, or member name."""
+        if not value:
+            return queryset
+
+        # Match GymMembers by name (first_name / last_name)
+        member_ids = GymMember.objects.filter(
+            Q(first_name__icontains=value) | Q(last_name__icontains=value)
+        ).values_list("member_id", flat=True)
+
+        return queryset.filter(
+            Q(member_id__icontains=value) |                # match ID
+            Q(membership_status__icontains=value) |        # match status
+            Q(created_date__icontains=value) |             # match created date
+            Q(member_id__in=member_ids)                    # match GymMember names
+        )
 
     class Meta:
         model = MembershipPayment
-        fields = ["member_id", "created_date", "membership_status", "member_name"]
-
-    def filter_by_member_name(self, queryset, name, value):
-        """Search MembershipPayment by member first/last name in GymMember"""
-        member_ids = GymMember.objects.filter(
-            Q(first_name__icontains=value) | Q(last_name__icontains=value)
-        ).values_list("id", flat=True)  # or .values_list("member_id", flat=True) depending on which field maps
-        return queryset.filter(member_id__in=member_ids)
-
+        fields = ["global_search"]
 # class MembershipPaymentFilter(filters.FilterSet):
 #     global_search = filters.CharFilter(method='filter_global_search', label='Search')
 
