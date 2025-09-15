@@ -52,22 +52,32 @@ class MembershipFilter(filters.FilterSet):
         fields = []
 
 
-class MembershipPaymentFilter(filters.FilterSet):
-    global_search = filters.CharFilter(method='filter_global_search', label='Search')
-
-    def filter_global_search(self, queryset, name, value):
-        """Perform a case-insensitive search across multiple fields in MembershipPayment model."""
-        if value:
-            return queryset.filter(
-                Q(member_id__icontains=value) |
-                Q(membership_status__icontains=value) |
-                Q(created_date__icontains=value)
-            )
-        return queryset
+import django_filters
+class MembershipPaymentFilter(django_filters.FilterSet):
+    member_id = django_filters.NumberFilter(field_name="member_id", lookup_expr="exact")
+    created_date = django_filters.DateFilter(field_name="created_date", lookup_expr="exact")
+    membership_status = django_filters.CharFilter(field_name="membership_status", lookup_expr="icontains")
 
     class Meta:
         model = MembershipPayment
-        fields = []
+        fields = ["member_id", "created_date", "membership_status"]
+
+# class MembershipPaymentFilter(filters.FilterSet):
+#     global_search = filters.CharFilter(method='filter_global_search', label='Search')
+
+#     def filter_global_search(self, queryset, name, value):
+#         """Perform a case-insensitive search across multiple fields in MembershipPayment model."""
+#         if value:
+#             return queryset.filter(
+#                 Q(member_id__icontains=value) |
+#                 Q(membership_status__icontains=value) |
+#                 Q(created_date__icontains=value)
+#             )
+#         return queryset
+
+    # class Meta:
+    #     model = MembershipPayment
+    #     fields = []
 
 # class GymAttendanceFilter(filters.FilterSet):
 #     global_search = filters.CharFilter(method='filter_global_search', label='Search')
