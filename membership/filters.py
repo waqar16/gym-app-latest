@@ -52,29 +52,37 @@ class MembershipFilter(filters.FilterSet):
         fields = []
 
 
+from django_filters import rest_framework as filters
+from django.db.models import Q
+from .models import MembershipPayment, GymMember
+
+
 class MembershipPaymentFilter(filters.FilterSet):
-    global_search = filters.CharFilter(method='filter_global_search', label='Search')
+    global_search = filters.CharFilter(method="filter_global_search", label="Search")
+    created_date = filters.DateFilter(field_name="created_date", lookup_expr="exact")
+    created_date__gte = filters.DateFilter(field_name="created_date", lookup_expr="gte")
+    created_date__lte = filters.DateFilter(field_name="created_date", lookup_expr="lte")
 
     def filter_global_search(self, queryset, name, value):
-        """Search by member_id, membership_status, created_date, or member name."""
+        """Search by member_id, membership_status, or member name."""
         if not value:
             return queryset
 
-        # Match GymMembers by name (first_name / last_name)
+        # Match GymMembers by name
         member_ids = GymMember.objects.filter(
             Q(first_name__icontains=value) | Q(last_name__icontains=value)
         ).values_list("member_id", flat=True)
 
         return queryset.filter(
-            Q(member_id__icontains=value) |                # match ID
-            Q(membership_status__icontains=value) |        # match status
-            Q(created_date__icontains=value) |             # match created date
-            Q(member_id__in=member_ids)                    # match GymMember names
+            Q(member_id__icontains=value) |
+            Q(membership_status__icontains=value) |
+            Q(member_id__in=member_ids)
         )
 
     class Meta:
         model = MembershipPayment
-        fields = ["global_search"]
+        fields = ["global_search", "created_date", "created_date__gte", "created_date__lte"]
+
 # class MembershipPaymentFilter(filters.FilterSet):
 #     global_search = filters.CharFilter(method='filter_global_search', label='Search')
 
