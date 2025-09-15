@@ -58,9 +58,19 @@ class MembershipPaymentFilter(django_filters.FilterSet):
     created_date = django_filters.DateFilter(field_name="created_date", lookup_expr="exact")
     membership_status = django_filters.CharFilter(field_name="membership_status", lookup_expr="icontains")
 
+    # Custom field for searching by member name
+    member_name = django_filters.CharFilter(method="filter_by_member_name")
+
     class Meta:
         model = MembershipPayment
-        fields = ["member_id", "created_date", "membership_status"]
+        fields = ["member_id", "created_date", "membership_status", "member_name"]
+
+    def filter_by_member_name(self, queryset, name, value):
+        """Search MembershipPayment by member first/last name in GymMember"""
+        member_ids = GymMember.objects.filter(
+            Q(first_name__icontains=value) | Q(last_name__icontains=value)
+        ).values_list("id", flat=True)  # or .values_list("member_id", flat=True) depending on which field maps
+        return queryset.filter(member_id__in=member_ids)
 
 # class MembershipPaymentFilter(filters.FilterSet):
 #     global_search = filters.CharFilter(method='filter_global_search', label='Search')
