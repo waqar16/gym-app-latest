@@ -67,6 +67,7 @@ class GymMemberSerializer(serializers.ModelSerializer):
 class MembershipPaymentSerializer(serializers.ModelSerializer):
     # Adding member_info field to show member's name
     member_info = serializers.SerializerMethodField()
+    membership_info = serializers.SerializerMethodField()
     # registration_fees = serializers.SerializerMethodField()
     total_amount = serializers.SerializerMethodField()
     due_amount = serializers.SerializerMethodField()
@@ -84,6 +85,23 @@ class MembershipPaymentSerializer(serializers.ModelSerializer):
         total = self.get_total_amount(obj)
         paid = obj.paid_amount or 0
         return max(total - paid, 0)
+    
+    def get_membership_info(self, obj):
+        membership = None
+        try:
+            # if model has a ForeignKey: obj.membership
+            membership = obj.membership  
+        except AttributeError:
+            try:
+                # fallback if you only store membership_id
+                membership = Membership.objects.filter(id=obj.membership_id).first()
+            except Membership.DoesNotExist:
+                membership = None
+
+        if membership:
+            return MembershipSerializer(membership).data
+        else:
+            return None
 
     def get_member_info(self, obj):
         member = None
