@@ -245,7 +245,7 @@ class AcceptPaymentView(APIView):
         total_amount = base_amount + registration_fees
         due_amount = total_amount - paid_amount
         if due_amount < 0:
-            due_amount = 0  # prevent negative
+            due_amount = 0
 
         
         payment = MembershipPayment.objects.get(mp_id=mp_id)
@@ -253,7 +253,8 @@ class AcceptPaymentView(APIView):
         # Save payment
         payment_data = {
             'membership_id': Membership.objects.get(membership_label=membership_class).id,
-            'paid_amount': paid_amount,  
+            'paid_amount': paid_amount,
+            "membership_amount": base_amount,  
             'signupfee': registration_fees,
             'start_date': timezone.now().date(),
             'end_date': updated_date_to_expire.date(),      
