@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from membership.models import GymMember, GymInout
 from membership.zk_utils import get_connection
-from django.utils.timezone import make_aware, is_naive
+from django.utils.timezone import make_aware, is_naive, get_current_timezone
 
 
 class Command(BaseCommand):
@@ -19,6 +19,12 @@ class Command(BaseCommand):
 
             logs = conn.get_attendance()
 
+            # Ensure all log timestamps are timezone-aware
+            for log in logs:
+                if is_naive(log.timestamp):
+                    log.timestamp = make_aware(log.timestamp, timezone=get_current_timezone())
+
+            # Filter only new logs
             if last_sync_time:
                 logs = [log for log in logs if log.timestamp > last_sync_time]
 
@@ -30,8 +36,6 @@ class Command(BaseCommand):
             for log in logs:
                 user_id = str(log.user_id)
                 punch_time = log.timestamp
-                if is_naive(punch_time):
-                    punch_time = make_aware(punch_time)
 
                 try:
                     member = GymMember.objects.get(members_reg_number=user_id)
