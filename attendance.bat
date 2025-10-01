@@ -1,17 +1,16 @@
 @echo off
+cls
 echo ==============================
-echo     Gym Attendance Sync Started
+echo   Running Gym Attendance Sync
 echo ==============================
 
-:: Activate the virtual environment
-call venv\Scripts\activate.bat
 
 :loop
-echo --------------------------------
-echo Running attendance sync at %time%
-python manage.py pull_zkteco
+    :: Activate the virtual environment
+    call venv\Scripts\activate.bat
 
-:: Wait for 5 seconds before the next sync
-timeout /t 5 >nul
+    :: Run the Django command (will loop internally)
+    python manage.py pull_zkteco >nul 2>&1
+
 
 goto loop
